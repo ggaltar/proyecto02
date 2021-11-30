@@ -183,9 +183,9 @@ server <- function(input, output, session) {
     # Registro de daños, zonas de conservación y ráster de zonas de conservación por cantidad
     leaflet() %>%
       setView(-84.08, 9.83, 8) %>%
-      addProviderTiles(providers$CartoDB.Voyager , group = "Voyager") %>%
-      addTiles(group = "OSM") %>%
       addProviderTiles(providers$CartoDB.Positron, group = "Positron") %>%
+      addTiles(group = "OSM") %>%
+      addProviderTiles(providers$CartoDB.Voyager , group = "Voyager") %>%
       addPolygons(
         data = zonas,
         color = "#38302e",
@@ -212,7 +212,7 @@ server <- function(input, output, session) {
         data = registros,
         stroke = F,
         radius = 3,
-        fillColor = '#6d597a',
+        fillColor = '#d62828',
         fillOpacity = 1,
         group = "Daños",
         label = paste0(
@@ -238,7 +238,7 @@ server <- function(input, output, session) {
       )  %>%
       
       addLayersControl(
-        baseGroups = c("Voyager", "OSM", "Positron"),
+        baseGroups = c("Positron", "OSM", "Voyager"),
         overlayGroups = c("Daños", "Red vial nacional", "Zonas de conservación"),
         options = layersControlOptions(collapsed = T)
       ) %>%
@@ -282,7 +282,7 @@ server <- function(input, output, session) {
     
     
     ggplot(elementos, aes(x = reorder(Elemento, -suma),y = suma)) +
-      geom_col(colour = "#6d597a", fill = "#6d597a",width = 0.5) +
+      geom_col(colour = "#d62828", fill = "#d62828",width = 0.5) +
       geom_text(aes(label = suma), vjust = 1.2, colour = "#93a8ac") +
       theme(plot.title = element_text(hjust = 0.5),
             axis.text.x = element_text(angle = 25,hjust = 1, vjust = 1, size = 14)

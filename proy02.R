@@ -14,6 +14,7 @@ library(leafem)
 library(shiny)
 library(shinydashboard)
 
+
 # DATOS
 
 # Capa de polígonos: zonas de conservación vial
@@ -28,7 +29,9 @@ rutas <-
   st_read(
     "https://raw.githubusercontent.com/ggaltar/danos_red_vial/main/capas/red_vial_nacional_wgs84.geojson",
     quiet = TRUE
-  )
+  ) 
+
+#rutas <- st_transform(rutas_wgs84, crs = 5367)
 
 # Capa de puntos: daños en la red vial nacional
 danos <-
@@ -52,6 +55,11 @@ lista_tipo <- c("Todos", lista_tipo)
 
 # Lista ordenada de severidad + "Todas"
 lista_severidad <- c("Todas", "Alta", "Media","Baja")
+
+# Lista ordenada de zonas + "Todas"
+lista_zonas <- unique(zonas$Zona2)
+lista_zonas <- sort(lista_zonas)
+lista_zonas <- c("Todas", lista_zonas)
 
 # COMPONENTES DE LA APLICACIÓN SHINY
 
@@ -80,6 +88,12 @@ ui <- dashboardPage(
         choices = lista_severidad,
         selected = "Todas"
       ),
+      selectInput(
+        inputId = "zona",
+        label = "Zona",
+        choices = lista_zonas,
+        selected = "Todas"
+      ),
       dateRangeInput(
         inputId = "fecha",
         label = "Fecha",
@@ -92,24 +106,25 @@ ui <- dashboardPage(
     )
   )),
   dashboardBody(fluidRow(
-    box(
-      title = "Mapa de ubicación de daños",
-      leafletOutput(outputId = "mapa"),
-      width = 12
-    ),
-
-    fluidRow(
       box(
-        title = "Registros de daños",
-        DTOutput(outputId = "tabla"),
+        title = "Mapa de ubicación de daños",
+        leafletOutput(outputId = "mapa"),
         width = 7
       ),
       box(
-        title = "Elementos dañados",
-        plotOutput(outputId = "grafico"),
+        title = "Registros de daños",
+        DTOutput(outputId = "tabla"),
         width = 5
       ),      
-    )    
+    ),    
+    fluidRow(
+    box(
+      title = "Elementos dañados",
+      plotOutput(outputId = "grafico"),
+      width = 12,
+      collapsible = TRUE,
+      collapsed = F,
+    )
   ))
 )
 
@@ -120,7 +135,7 @@ server <- function(input, output, session) {
     # Remoción de geometrías y selección de columnas
     danos_filtrado <-
       danos %>%
-      dplyr::select(estructura,elemento, tipo, severidad, fecha_dano)
+      dplyr::select(estructura,elemento, tipo, severidad, descripcio, fecha_dano, cod_zona)
     
     # Filtrado de daños por estructura
     if (input$estructura != "Todas") {
@@ -140,6 +155,13 @@ server <- function(input, output, session) {
         danos_filtrado %>%
         filter(severidad == input$severidad)
     }
+    # Filtrado de daños por zona
+    if (input$zona != "Todas") {
+      zona <- zonas %>%
+        filter(Zona2 == input$zona)
+      danos_filtrado <-
+        st_intersection(danos_filtrado,zona)
+    }
     # Filtrado de daños por fecha
     danos_filtrado <-
       danos_filtrado %>%
@@ -155,29 +177,37 @@ server <- function(input, output, session) {
   
   output$mapa <- renderLeaflet({
     registros <- filtrarDanos()
-
+    
+    lista_colores <- c("#94d2bd","#94d2bd","#ee9b00","#ca6702","#bb3e03","#ae2012","#9b2226","#ef476f","#ffd166","#06d6a0","#118ab2","#073b4c","#495057")
+    
     # Registro de daños, zonas de conservación y ráster de zonas de conservación por cantidad
     leaflet() %>%
+      setView(-84.08, 9.83, 8) %>%
       addProviderTiles(providers$CartoDB.Voyager , group = "Voyager") %>%
       addTiles(group = "OSM") %>%
       addProviderTiles(providers$CartoDB.Positron, group = "Positron") %>%
-      setView(-84.10, 9.5, 7) %>%
       addPolygons(
         data = zonas,
-        color = "#370617",
+        color = "#38302e",
         fillColor = "transparent",
         stroke = TRUE,
-        weight = 1.0,
+        weight = 3,
+        opacity = 1,
         group = "Zonas de conservación"
-      ) %>%
-      addPolygons(
+      ) %>%    
+      addPolylines(
         data = rutas,
-        color = "#370617",
+        color = "#788585",
         fill = FALSE,
         stroke = TRUE,
-        weight = 1.0,
-        group = "Red vial nacional"
+        weight = 1,
+        opacity = 1,
+        group = "Red vial nacional",
+        label = paste0(
+          "Ruta: ", rutas$ruta
+        )
       ) %>%
+      
       addCircleMarkers(
         data = registros,
         stroke = F,
@@ -190,9 +220,7 @@ server <- function(input, output, session) {
           ", ",
           "Elemento: ", registros$elemento,
           ", ",
-          "Tipo: ", registros$tipo,
-          ", ",
-          "Severidad: ", registros$severidad
+          "Tipo: ", registros$tipo
         ),
         popup = paste0(
           "<strong>Estructura: </strong>", registros$estructura,
@@ -201,15 +229,21 @@ server <- function(input, output, session) {
           "<br>",
           "<strong>Tipo de daño: </strong>", registros$tipo,
           "<br>",
+          "<strong>Descripción: </strong>", registros$descripcio,
+          "<br>",
+          "<strong>Fecha del daño (año-mes-día): </strong>", registros$fecha_dano,
+          "<br>",
           "<strong>Severidad: </strong>", registros$severidad
         )
       )  %>%
+      
       addLayersControl(
         baseGroups = c("Voyager", "OSM", "Positron"),
-        overlayGroups = c("Daños", "Zonas de conservación"),
+        overlayGroups = c("Daños", "Red vial nacional", "Zonas de conservación"),
         options = layersControlOptions(collapsed = T)
       ) %>%
-      #hideGroup("Zonas por cantidad") %>%
+      
+      hideGroup("Zonas de conservación 2") %>%
       addSearchOSM() %>%
       addResetMapButton() %>%
       addMouseCoordinates()
@@ -220,11 +254,13 @@ server <- function(input, output, session) {
   output$tabla <- renderDT({
     registros <- filtrarDanos()
     registros %>%
+      dplyr::select(estructura,elemento, tipo, severidad, fecha_dano) %>%
       st_drop_geometry() %>%
       
       datatable(rownames = FALSE,
                 colnames = c('Estructura','Elemento', 'Tipo', 'Severidad','Fecha'),
                 options = list(
+                  pageLength = 7,
                   language = list(url = '//cdn.datatables.net/plug-ins/1.10.11/i18n/Spanish.json')
                 )
       )
@@ -232,7 +268,6 @@ server <- function(input, output, session) {
   
   # Gráfico de principales elementos dañados
   
-  lista_colores <- c("#001219","#005f73","#0a9396","#94d2bd","#94d2bd","#ee9b00","#ca6702","#bb3e03","#ae2012","#9b2226","#ef476f","#ffd166","#06d6a0","#118ab2","#073b4c","#495057")
   
   output$grafico <- renderPlot({
     # Preparación de los datos
@@ -248,11 +283,11 @@ server <- function(input, output, session) {
     
     ggplot(elementos, aes(x = reorder(Elemento, -suma),y = suma)) +
       geom_col(colour = "#6d597a", fill = "#6d597a",width = 0.5) +
-      geom_text(aes(label = suma), vjust = 1.2, colour = "White") +
+      geom_text(aes(label = suma), vjust = 1.2, colour = "#93a8ac") +
       theme(plot.title = element_text(hjust = 0.5),
-            axis.text.x = element_text(angle = 30,hjust = 1, vjust = 1)
+            axis.text.x = element_text(angle = 25,hjust = 1, vjust = 1, size = 14)
       ) +
-      xlab("Elementos") +
+      xlab("") +
       ylab("Cantidad")
     
   })  

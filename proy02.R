@@ -27,7 +27,7 @@ zonas <-
 # Capa de líneas: red vial nacional
 rutas <-
   st_read(
-    "https://raw.githubusercontent.com/ggaltar/danos_red_vial/main/capas/red_vial_nacional_wgs84.geojson",
+    "https://raw.githubusercontent.com/ggaltar/proyecto02/main/capas/rvn_crtm05.geojson",
     quiet = TRUE
   ) 
 

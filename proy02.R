@@ -61,6 +61,11 @@ lista_zonas <- unique(zonas$Zona2)
 lista_zonas <- sort(lista_zonas)
 lista_zonas <- c("Todas", lista_zonas)
 
+# Lista ordenada de rutas + "Todas"
+lista_rutas <- unique(rutas$ruta)
+lista_rutas <- sort(lista_rutas)
+lista_rutas <- c("Todas", lista_rutas)
+
 # COMPONENTES DE LA APLICACIÓN SHINY
 
 # Definición del objeto ui
@@ -92,6 +97,12 @@ ui <- dashboardPage(
         inputId = "zona",
         label = "Zona",
         choices = lista_zonas,
+        selected = "Todas"
+      ),
+      selectInput(
+        inputId = "ruta",
+        label = "Ruta",
+        choices = lista_rutas,
         selected = "Todas"
       ),
       dateRangeInput(
@@ -155,12 +166,20 @@ server <- function(input, output, session) {
         danos_filtrado %>%
         filter(severidad == input$severidad)
     }
-    # Filtrado de daños por zona
+    # Filtrado espacial de daños por zona
     if (input$zona != "Todas") {
       zona <- zonas %>%
         filter(Zona2 == input$zona)
       danos_filtrado <-
         st_intersection(danos_filtrado,zona)
+    }
+    # Filtrado espacial de daños por ruta
+    if (input$ruta != "Todas") {
+      ruta <- rutas %>%
+        filter(ruta == input$ruta)
+      buffer <- st_buffer (ruta,100)
+      danos_filtrado <-
+        st_intersection(danos_filtrado,buffer)
     }
     # Filtrado de daños por fecha
     danos_filtrado <-
@@ -283,7 +302,7 @@ server <- function(input, output, session) {
     
     ggplot(elementos, aes(x = reorder(Elemento, -suma),y = suma)) +
       geom_col(colour = "#d62828", fill = "#d62828",width = 0.5) +
-      geom_text(aes(label = suma), vjust = 1.2, colour = "#93a8ac") +
+      geom_text(aes(label = suma), vjust = 1.2, colour = "black") +
       theme(plot.title = element_text(hjust = 0.5),
             axis.text.x = element_text(angle = 25,hjust = 1, vjust = 1, size = 14)
       ) +

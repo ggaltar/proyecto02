@@ -36,7 +36,7 @@ rutas <-
 # Capa de puntos: daños en la red vial nacional
 danos <-
   st_read(
-    "https://raw.githubusercontent.com/ggaltar/danos_red_vial/main/capas/danos_wgs84.geojso",
+    "https://raw.githubusercontent.com/ggaltar/danos_red_vial/main/capas/danos_wgs84.geojson",
     quiet = TRUE
   )
 
